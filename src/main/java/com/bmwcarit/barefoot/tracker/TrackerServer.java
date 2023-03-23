@@ -12,21 +12,11 @@
  */
 package com.bmwcarit.barefoot.tracker;
 
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.atomic.AtomicReference;
-
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.zeromq.ZMQ;
-
 import com.bmwcarit.barefoot.matcher.Matcher;
 import com.bmwcarit.barefoot.matcher.MatcherCandidate;
 import com.bmwcarit.barefoot.matcher.MatcherKState;
 import com.bmwcarit.barefoot.matcher.MatcherSample;
+import com.bmwcarit.barefoot.rabbitmq.RabbitmqClient;
 import com.bmwcarit.barefoot.roadmap.Road;
 import com.bmwcarit.barefoot.roadmap.RoadMap;
 import com.bmwcarit.barefoot.roadmap.RoadPoint;
@@ -42,6 +32,17 @@ import com.bmwcarit.barefoot.tracker.TemporaryMemory.Publisher;
 import com.bmwcarit.barefoot.tracker.TemporaryMemory.TemporaryElement;
 import com.bmwcarit.barefoot.util.AbstractServer;
 import com.bmwcarit.barefoot.util.Stopwatch;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.zeromq.ZMQ;
+
+import java.io.IOException;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.atomic.AtomicReference;
 
 ;
 
@@ -272,10 +273,13 @@ public class TrackerServer extends AbstractServer {
         private ZMQ.Context context = null;
         private ZMQ.Socket socket = null;
 
+        private RabbitmqClient rabbitmqClient;
+
         public StatePublisher(int port) {
             context = ZMQ.context(1);
-            socket = context.socket(ZMQ.PUB);
-            socket.bind("tcp://*:" + port);
+//            socket = context.socket(ZMQ.PUB);
+//            socket.bind("tcp://*:" + port);
+            rabbitmqClient = new RabbitmqClient();
             this.setDaemon(true);
             this.start();
         }
@@ -285,10 +289,13 @@ public class TrackerServer extends AbstractServer {
             while (true) {
                 try {
                     String message = queue.take();
-                    socket.send(message);
+//                    socket.send(message);
+                    rabbitmqClient.publish(message);
                 } catch (InterruptedException e) {
                     logger.warn("state publisher interrupted");
                     return;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
             }
         }
